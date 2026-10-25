@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'ui/theme.dart';
 import 'ui/auth_screen.dart';
 import 'ui/home_screen.dart';
+import 'ui/verify_email_screen.dart';
 import 'providers/providers.dart';
 
 void main() async {
@@ -28,14 +29,28 @@ class MyApp extends ConsumerWidget {
       home: authState.when(
         data: (user) {
           if (user != null) {
-            // Logged in! Go to contacts/friends list.
+            // If the user's Gmail is not yet verified, require verification first
+            if (!user.emailVerified) {
+              return const VerifyEmailScreen();
+            }
+            // Verified and Logged in! Go to contacts/friends list.
             return const HomeScreen();
           }
           // Not logged in! Go to Auth screen.
           return const AuthScreen();
         },
-        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-        error: (e, st) => Scaffold(body: Center(child: Text('Error: $e'))),
+        loading: () => const Scaffold(
+          backgroundColor: Color(0xFF0F0C20),
+          body: Center(
+            child: CircularProgressIndicator(color: Color(0xFFE94560)),
+          ),
+        ),
+        error: (e, st) => Scaffold(
+          backgroundColor: const Color(0xFF0F0C20),
+          body: Center(
+            child: Text('Error: $e', style: const TextStyle(color: Colors.white)),
+          ),
+        ),
       ),
     );
   }

@@ -13,7 +13,7 @@ final chatServiceProvider = Provider<ChatService>((ref) {
 });
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  return ref.watch(authServiceProvider).authStateChanges;
+  return ref.watch(authServiceProvider).userChanges;
 });
 
 // Pass chatRoomId using Family

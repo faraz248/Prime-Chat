@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need access to the microphone for voice messages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to send images.</string>
 </dict>
 </plist>
