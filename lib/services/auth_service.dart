@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
+import '../utils/session_manager.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -207,8 +208,10 @@ class AuthService {
         displayName: nameOverride ?? user.displayName ?? 'User',
         photoUrl: user.photoURL,
       );
+      final map = userModel.toMap();
+      map['currentSessionId'] = SessionManager.newSessionId();
       await _firestore.collection('users').doc(user.uid).set(
-        userModel.toMap(),
+        map,
         SetOptions(merge: true),
       );
     }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../models/message_model.dart';
 import 'gemini_service.dart';
@@ -253,11 +254,15 @@ class ChatService {
 
   Future<void> clearChat(String chatRoomId) async {
     final messages = await _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').get();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
     WriteBatch batch = _firestore.batch();
     for (var doc in messages.docs) {
       batch.update(doc.reference, {
         'isDeleted': true,
         'deletedAt': FieldValue.serverTimestamp(),
+        'deletedBy': uid,
+        'deletedByName': uName,
       });
     }
     await batch.commit();
@@ -268,20 +273,28 @@ class ChatService {
   }
 
   Future<void> deleteMessage(String chatRoomId, String messageId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
     await _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').doc(messageId).update({
       'isDeleted': true,
       'deletedAt': FieldValue.serverTimestamp(),
+      'deletedBy': uid,
+      'deletedByName': uName,
     });
   }
 
   Future<void> deleteMultipleMessages(String chatRoomId, List<String> messageIds) async {
     if (messageIds.isEmpty) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uName = FirebaseAuth.instance.currentUser?.displayName ?? 'User';
     WriteBatch batch = _firestore.batch();
     for (var id in messageIds) {
       final docRef = _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').doc(id);
       batch.update(docRef, {
         'isDeleted': true,
         'deletedAt': FieldValue.serverTimestamp(),
+        'deletedBy': uid,
+        'deletedByName': uName,
       });
     }
     await batch.commit();

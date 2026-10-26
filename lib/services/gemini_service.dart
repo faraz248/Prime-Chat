@@ -18,9 +18,64 @@ class GeminiService {
   static const String _systemInstruction = 
     'You are Prime AI Assistant & Tutor, a friendly, ultra-intelligent personal assistant and academic tutor inside Prime Chat. '
     '1. ACADEMIC & PROBLEM SOLVER: When a user sends an image of a problem, question, textbook page, homework, math equation, coding question, or assignment, inspect the image thoroughly. Answer the user\'s question or problem step-by-step with high accuracy, clarity, and helpful explanations in their language (Hindi, Hinglish, or English). If the problem is complex, break it down clearly. '
-    '2. IMAGE GENERATION: If the user asks for any photo, image, picture, wallpaper, drawing, or visual (e.g. "dog ki photo bhejo", "send a photo of a sports car", "tasveer dikhao"), you CAN and MUST provide it! '
+    '2. FORMATTING RULES (CRITICAL): '
+    '- NEVER use LaTeX math notation, dollar signs (\$ or \$\$), backslashes, or code tags like \\text{}, \\emptyset, \\{...\\}, etc. '
+    '- NEVER use raw markdown headers (### or ##). '
+    '- Write all mathematical formulas and answers in simple, crystal-clear plain text using standard symbols (e.g., write "A - B = 1", "Visited: {A}", "Empty set", "x^2", "a / b", "Cost = 1"). '
+    '- Keep explanations super easy for a student to read on a mobile phone without confusing mathematical symbols. Use clean numbered steps (1., 2., 3.) and bullet points (•). '
+    '3. IMAGE GENERATION: If the user asks for any photo, image, picture, wallpaper, drawing, or visual (e.g. "dog ki photo bhejo", "send a photo of a sports car", "tasveer dikhao"), you CAN and MUST provide it! '
     'To provide an image, you MUST include [IMAGE: descriptive english visual prompt] in your response alongside a natural, warm message. '
     'NEVER say you cannot view images or that you are text-only. You fully support multimodal vision and can analyze all photos, documents, and homework assignments.';
+
+  static String cleanAiFormatting(String text) {
+    var s = text;
+    // Replace common LaTeX terms with plain words/symbols
+    s = s.replaceAll(r'\emptyset', 'Empty Set (∅)');
+    s = s.replaceAll(r'\infty', '∞');
+    s = s.replaceAll(r'\times', '×');
+    s = s.replaceAll(r'\div', '÷');
+    s = s.replaceAll(r'\leq', '≤');
+    s = s.replaceAll(r'\geq', '≥');
+    s = s.replaceAll(r'\neq', '≠');
+    s = s.replaceAll(r'\approx', '≈');
+    s = s.replaceAll(r'\pm', '±');
+    s = s.replaceAll(r'\to', '➔');
+    s = s.replaceAll(r'\leftarrow', '←');
+    s = s.replaceAll(r'\rightarrow', '➔');
+
+    // Remove LaTeX wrapper commands like \text{...}, \mathbf{...}, \mathit{...}
+    s = s.replaceAllMapped(RegExp(r'\\(?:text|mathbf|mathit|mathrm|mathbb|mathcal)\{([^}]*)\}'), (m) => m.group(1) ?? '');
+    
+    // Clean fractions: \frac{a}{b} -> (a / b)
+    s = s.replaceAllMapped(RegExp(r'\\frac\{([^}]*)\}\{([^}]*)\}'), (m) => '(${m.group(1)} / ${m.group(2)})');
+
+    // Clean square root: \sqrt{x} -> √(x)
+    s = s.replaceAllMapped(RegExp(r'\\sqrt\{([^}]*)\}'), (m) => '√(${m.group(1)})');
+
+    // Clean LaTeX escaped braces: \{A\} -> {A}
+    s = s.replaceAll(r'\{', '{').replaceAll(r'\}', '}');
+
+    // Remove all dollar signs used for math blocks ($$ and $)
+    s = s.replaceAll(r'$$', '');
+    s = s.replaceAll(r'$', '');
+
+    // Remove raw Markdown header hashes at beginning of lines (### Title -> Title)
+    s = s.replaceAll(RegExp(r'^\s*#{1,6}\s*', multiLine: true), '');
+
+    // Clean up nested asterisks like ****A**** -> **A**
+    s = s.replaceAll('****', '**');
+
+    // Clean up multiple horizontal rule lines (---)
+    s = s.replaceAll(RegExp(r'^\s*---+\s*$', multiLine: true), '');
+
+    // Replace standalone asterisk bullets (* ) with nice clean bullet points (• )
+    s = s.replaceAll(RegExp(r'^\s*\*\s+', multiLine: true), '• ');
+
+    // Normalize excessive newlines
+    s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+
+    return s.trim();
+  }
 
   Future<String> getAiResponse(String prompt, {String? imageUrl}) async {
     // Prepare image payload if available
@@ -98,7 +153,7 @@ class GeminiService {
             if (returnedParts != null && returnedParts.isNotEmpty) {
               final text = returnedParts[0]['text'] as String?;
               if (text != null && text.trim().isNotEmpty) {
-                return text.trim();
+                return cleanAiFormatting(text);
               }
             }
           }

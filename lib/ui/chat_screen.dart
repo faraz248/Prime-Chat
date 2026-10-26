@@ -13,6 +13,7 @@ import '../models/message_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/chat_service.dart';
+import '../services/gemini_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:record/record.dart';
@@ -1854,11 +1855,11 @@ class _ChatBubble extends StatelessWidget {
                 message.text != "🎥 Video" &&
                 message.text != "🎤 Audio Note")
               Text(
-                message.text,
+                isAi ? GeminiService.cleanAiFormatting(message.text) : message.text,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
-                  height: 1.3,
+                  height: 1.35,
                 ),
               ),
             const SizedBox(height: 4),

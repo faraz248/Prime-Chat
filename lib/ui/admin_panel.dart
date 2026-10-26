@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'admin_chat_view.dart';
 
 class AdminPanel extends StatefulWidget {
@@ -60,8 +61,9 @@ class _AdminPanelState extends State<AdminPanel> {
       appBar: AppBar(
         title: Text(
           _selectedIndex == 0 ? 'Admin Secret Panel' : 
-          _selectedIndex == 1 ? 'Deleted Messages' : 
-          _selectedIndex == 2 ? 'Registered Users' : 'All Groups', 
+          _selectedIndex == 1 ? 'AI Chat History' : 
+          _selectedIndex == 2 ? 'Deleted Messages' : 
+          _selectedIndex == 3 ? 'Registered Users' : 'All Groups', 
           style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)
         ),
         backgroundColor: const Color(0xFF1A1A2E),
@@ -83,10 +85,18 @@ class _AdminPanelState extends State<AdminPanel> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.psychology_rounded, color: Colors.amberAccent),
+              title: const Text('AI Chats History (User 🤖)', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+              onTap: () {
+                setState(() => _selectedIndex = 1);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.delete_sweep, color: Colors.redAccent),
               title: const Text('Deleted Messages', style: TextStyle(color: Colors.redAccent)),
               onTap: () {
-                setState(() => _selectedIndex = 1);
+                setState(() => _selectedIndex = 2);
                 Navigator.pop(context);
               },
             ),
@@ -94,7 +104,7 @@ class _AdminPanelState extends State<AdminPanel> {
               leading: const Icon(Icons.people, color: Colors.blueAccent),
               title: const Text('Registered Users', style: TextStyle(color: Colors.blueAccent)),
               onTap: () {
-                setState(() => _selectedIndex = 2);
+                setState(() => _selectedIndex = 3);
                 Navigator.pop(context);
               },
             ),
@@ -102,16 +112,17 @@ class _AdminPanelState extends State<AdminPanel> {
               leading: const Icon(Icons.group_work, color: Colors.greenAccent),
               title: const Text('All Groups', style: TextStyle(color: Colors.greenAccent)),
               onTap: () {
-                setState(() => _selectedIndex = 3);
+                setState(() => _selectedIndex = 4);
                 Navigator.pop(context);
               },
             ),
           ],
         ),
       ),
-      body: _selectedIndex == 3 ? _buildGroupsList() : 
-            _selectedIndex == 2 ? _buildUsersList() : 
-            _selectedIndex == 1 ? _buildDeletedMessagesFeed() : _buildChatsList(),
+      body: _selectedIndex == 4 ? _buildGroupsList() : 
+            _selectedIndex == 3 ? _buildUsersList() : 
+            _selectedIndex == 2 ? _buildDeletedMessagesFeed() : 
+            _selectedIndex == 1 ? _buildAiChatsList() : _buildChatsList(),
     );
   }
 
@@ -190,6 +201,106 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
+  // 🤖 All AI Assistant conversations across users
+  Widget _buildAiChatsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('chatRooms').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Colors.amberAccent));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('No AI conversations found.', style: TextStyle(color: Colors.white54)));
+        }
+
+        final aiRooms = snapshot.data!.docs.where((doc) => doc.id.startsWith('ai_room_')).toList();
+
+        if (aiRooms.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.smart_toy_outlined, color: Colors.amberAccent, size: 54),
+                SizedBox(height: 12),
+                Text('No user has chatted with AI Assistant yet.', style: TextStyle(color: Colors.white54)),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: aiRooms.length,
+          padding: const EdgeInsets.all(10),
+          itemBuilder: (context, index) {
+            final room = aiRooms[index];
+            final data = room.data() as Map<String, dynamic>?;
+            final userId = room.id.replaceAll('ai_room_', '');
+            final userName = userNames[userId] ?? 'User ($userId)';
+            final lastMsg = data?['lastMessage'] ?? 'AI Chat session...';
+            final lastTime = (data?['lastMessageTime'] as Timestamp?)?.toDate();
+            final timeStr = lastTime != null ? DateFormat('dd MMM, hh:mm a').format(lastTime) : '';
+
+            return Card(
+              color: const Color(0xFF16213E),
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.amberAccent.withOpacity(0.35)),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amberAccent.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.psychology_rounded, color: Colors.amberAccent, size: 24),
+                ),
+                title: Row(
+                  children: [
+                    Text(userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE94560).withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('AI CHAT', style: TextStyle(color: Color(0xFFE94560), fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(lastMsg, style: const TextStyle(color: Colors.white70, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    if (timeStr.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(timeStr, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                    ],
+                  ],
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.amberAccent, size: 16),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => AdminChatView(
+                      chatRoomId: room.id,
+                      roomName: '$userName 🤖 AI Assistant',
+                      userNames: userNames,
+                      showOnlyDeleted: false,
+                    ),
+                  ));
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 🗑️ Feed of Deleted Messages with "thoda light" appearance and who deleted it
   Widget _buildDeletedMessagesFeed() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collectionGroup('messages').where('isDeleted', isEqualTo: true).snapshots(),
@@ -202,12 +313,11 @@ class _AdminPanelState extends State<AdminPanel> {
         }
 
         final docs = snapshot.data!.docs.toList();
-        // Sort in dart to avoid requiring composite index
         docs.sort((a, b) {
           final aTime = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
           final bTime = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
           if (aTime == null || bTime == null) return 0;
-          return bTime.compareTo(aTime); // Descending
+          return bTime.compareTo(aTime);
         });
 
         return ListView.builder(
@@ -219,10 +329,14 @@ class _AdminPanelState extends State<AdminPanel> {
             final text = data['text'] ?? '';
             final senderId = data['senderId'] ?? '';
             final senderName = userNames[senderId] ?? 'Unknown User';
+            final deletedByName = data['deletedByName'] ?? 
+                (data['deletedBy'] != null ? userNames[data['deletedBy']] : senderName);
+
             final timestamp = data['timestamp'] as Timestamp?;
-            final timeStr = timestamp != null ? timestamp.toDate().toString().substring(0, 16) : '';
+            final timeStr = timestamp != null ? DateFormat('dd MMM, hh:mm a').format(timestamp.toDate()) : '';
+            final delTs = data['deletedAt'] as Timestamp?;
+            final delTimeStr = delTs != null ? DateFormat('dd MMM, hh:mm a').format(delTs.toDate()) : '';
             
-            // Try to extract room ID from reference (messages are stored under chatRooms/ROOM_ID/messages)
             String roomId = 'Unknown Room';
             if (doc.reference.parent.parent != null) {
               roomId = doc.reference.parent.parent!.id;
@@ -230,48 +344,73 @@ class _AdminPanelState extends State<AdminPanel> {
             final roomName = _getRoomName(roomId);
 
             return Card(
-              color: const Color(0xFF1E1E28),
+              color: const Color(0xFF1E1420), // "thoda light" translucent dark card
               margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.delete_forever, color: Colors.redAccent, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: RichText(
-                            text: TextSpan(
-                              style: const TextStyle(color: Colors.white70, fontSize: 13),
-                              children: [
-                                TextSpan(text: senderName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-                                const TextSpan(text: ' deleted a message in '),
-                                TextSpan(text: roomName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
-                              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.redAccent.withOpacity(0.35)),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => AdminChatView(
+                      chatRoomId: roomId,
+                      roomName: roomName,
+                      userNames: userNames,
+                      showOnlyDeleted: false,
+                    ),
+                  ));
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.delete_forever, color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                children: [
+                                  TextSpan(text: deletedByName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                  const TextSpan(text: ' deleted message from '),
+                                  TextSpan(text: senderName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent)),
+                                  const TextSpan(text: ' in '),
+                                  TextSpan(text: roomName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black45,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                        ],
                       ),
-                      child: Text('"$text"', style: const TextStyle(color: Colors.white, fontSize: 15, fontStyle: FontStyle.italic)),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Text(timeStr, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-                    )
-                  ],
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.black38,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                        ),
+                        child: Text(
+                          '"$text"', 
+                          style: const TextStyle(color: Colors.white70, fontSize: 14, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Deleted: $delTimeStr', style: const TextStyle(color: Colors.redAccent, fontSize: 10)),
+                          Text('Sent: $timeStr', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                        ],
+                      )
+                    ],
+                  ),
                 ),
               ),
             );
@@ -281,6 +420,7 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
+  // 👥 Registered Users List with 1-click AI Chat History access
   Widget _buildUsersList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('users').snapshots(),
@@ -346,7 +486,7 @@ class _AdminPanelState extends State<AdminPanel> {
                                 : null,
                             child: (photoUrl != null && photoUrl.toString().isNotEmpty)
                                 ? null
-                                : Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
+                                : Text(name.isNotEmpty ? name[0].toUpperCase() : 'U', style: const TextStyle(color: Colors.white)),
                           ),
                           title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           subtitle: Column(
@@ -366,6 +506,21 @@ class _AdminPanelState extends State<AdminPanel> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              // 🤖 1-Click AI Assistant History Button
+                              IconButton(
+                                icon: const Icon(Icons.psychology_rounded, color: Colors.amberAccent),
+                                tooltip: 'View $name\'s AI Chat History',
+                                onPressed: () {
+                                  Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => AdminChatView(
+                                      chatRoomId: 'ai_room_${user.id}',
+                                      roomName: '$name 🤖 AI History',
+                                      userNames: userNames,
+                                      showOnlyDeleted: false,
+                                    ),
+                                  ));
+                                },
+                              ),
                               Text(isBlocked ? 'Blocked' : 'Active', style: TextStyle(color: isBlocked ? Colors.redAccent : Colors.green)),
                               Switch(
                                 value: isBlocked,
@@ -387,6 +542,7 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
+  // 💬 All Chats (User-to-User & Groups)
   Widget _buildChatsList() {
     return Column(
       children: [
@@ -450,7 +606,12 @@ class _AdminPanelState extends State<AdminPanel> {
                     color: const Color(0xFF16213E),
                     margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     child: ListTile(
-                      leading: Icon(data != null && data['isGroup'] == true ? Icons.group : Icons.security, color: Colors.redAccent),
+                      leading: Icon(
+                        room.id.startsWith('ai_room_') 
+                            ? Icons.psychology_rounded 
+                            : (data != null && data['isGroup'] == true ? Icons.group : Icons.security), 
+                        color: room.id.startsWith('ai_room_') ? Colors.amberAccent : Colors.redAccent,
+                      ),
                       title: Text(roomName, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       subtitle: Text('Latest: $lastMsg', style: const TextStyle(color: Colors.white54), maxLines: 2, overflow: TextOverflow.ellipsis),
                       trailing: const Icon(Icons.visibility, color: Colors.redAccent),
@@ -460,7 +621,7 @@ class _AdminPanelState extends State<AdminPanel> {
                             chatRoomId: room.id, 
                             roomName: roomName,
                             userNames: userNames,
-                            showOnlyDeleted: _selectedIndex == 1,
+                            showOnlyDeleted: false,
                           ),
                         ));
                       },
@@ -475,6 +636,7 @@ class _AdminPanelState extends State<AdminPanel> {
     );
   }
 
+  // 👥 All Groups
   Widget _buildGroupsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('chatRooms').where('isGroup', isEqualTo: true).snapshots(),

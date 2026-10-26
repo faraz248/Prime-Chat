@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/pwa_installer.dart';
+import '../utils/session_manager.dart';
 import '../providers/providers.dart';
 import 'chat_screen.dart';
 import 'admin_panel.dart';
@@ -486,6 +487,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
               ),
             );
+          }
+
+          // Single Device Login Enforcement
+          final serverSessionId = data['currentSessionId'];
+          if (serverSessionId != null && serverSessionId.toString().isNotEmpty) {
+            if (serverSessionId != SessionManager.currentSessionId) {
+              return Scaffold(
+                backgroundColor: const Color(0xFF0D0D12),
+                appBar: AppBar(
+                  title: const Text('Session Expired'),
+                  backgroundColor: const Color(0xFF161622),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      tooltip: 'Log Out',
+                      onPressed: () => ref.read(authServiceProvider).signOut(),
+                    )
+                  ],
+                ),
+                body: Center(
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(24),
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF161622),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.amberAccent.withOpacity(0.4)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.amberAccent.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.devices_other_rounded, color: Colors.amberAccent, size: 54),
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'LOGGED IN ON ANOTHER DEVICE',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.amberAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Aapka account kisi doosre phone ya computer par login ho gaya hai. Suraksha ke liye ek time me ek hi device me login chal sakta hai.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                        ),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE94560),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.login, color: Colors.white, size: 18),
+                            label: const Text(
+                              'Login On This Device',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () async {
+                              final newId = SessionManager.newSessionId();
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(currentUserId)
+                                  .update({'currentSessionId': newId});
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextButton(
+                          onPressed: () => ref.read(authServiceProvider).signOut(),
+                          child: const Text('Log Out', style: TextStyle(color: Colors.white54)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+          } else {
+            // First time setup: set this device as primary active session
+            FirebaseFirestore.instance
+                .collection('users')
+                .doc(currentUserId)
+                .update({'currentSessionId': SessionManager.currentSessionId})
+                .catchError((_) {});
           }
         }
 
