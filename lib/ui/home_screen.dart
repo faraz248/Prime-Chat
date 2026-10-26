@@ -179,9 +179,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       '📱 Download Android APK',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
-                    onPressed: () async {
-                      final uri = Uri.parse('nexus-chat.apk');
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          backgroundColor: const Color(0xFF1E293B),
+                          title: Row(
+                            children: const [
+                              Icon(Icons.android, color: Colors.greenAccent),
+                              SizedBox(width: 8),
+                              Text('Android App Options', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          content: const Text(
+                            'Android par app do aasan tariko se chala sakte hain:\n\n'
+                            '1️⃣ Instant Web App (PWA):\n'
+                            'Chrome browser me upar 3 dots (⋮) par tap karein aur "Install app" / "Add to Home screen" dabayein. Yeh bina kisi download ke foran mobile me app ban jati hai!\n\n'
+                            '2️⃣ Standalone APK File:\n'
+                            'Aapke PC me native Android APK file create ho chuki hai:\nbuild/app/outputs/flutter-apk/app-debug.apk\nAap ise direct phone me transfer karke install kar sakte hain.',
+                            style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(c),
+                              child: const Text('Got It', style: TextStyle(color: Color(0xFFE94560), fontWeight: FontWeight.bold)),
+                            )
+                          ],
+                        ),
+                      );
                     },
                   ),
                 ),
