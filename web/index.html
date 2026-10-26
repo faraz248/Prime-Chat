@@ -20,6 +20,31 @@
 
   <title>Nexus Chat</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      window.deferredPrompt = e;
+      console.log('Nexus Chat: beforeinstallprompt captured!');
+    });
+
+    window.triggerPwaInstall = async function() {
+      if (window.deferredPrompt) {
+        window.deferredPrompt.prompt();
+        const choice = await window.deferredPrompt.userChoice;
+        console.log('Nexus Chat install outcome:', choice.outcome);
+        window.deferredPrompt = null;
+        return choice.outcome === 'accepted';
+      }
+      return false;
+    };
+
+    window.hasInstallPrompt = function() {
+      return !!window.deferredPrompt;
+    };
+  </script>
 </head>
 <body style="background-color: #0D0D12; margin: 0; padding: 0;">
   <script src="flutter_bootstrap.js" async></script>

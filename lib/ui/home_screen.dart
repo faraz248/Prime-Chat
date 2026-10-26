@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../utils/pwa_installer.dart';
 import '../providers/providers.dart';
 import 'chat_screen.dart';
 import 'admin_panel.dart';
@@ -87,86 +89,199 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         backgroundColor: const Color(0xFF161622),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
-          width: 440,
+          width: 480,
           padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE94560).withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.install_mobile_rounded, color: Color(0xFFE94560), size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Install Nexus App',
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'Use full-screen like a native installed app',
-                          style: TextStyle(color: Colors.white60, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF222232),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Column(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    _buildInstallStep(
-                      icon: Icons.android_rounded,
-                      color: Colors.greenAccent,
-                      title: 'Android Phone (Chrome)',
-                      instruction: 'Tap browser 3 dots (⋮) top-right, then tap "Add to Home screen" or "Install app".',
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE94560).withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.install_mobile_rounded, color: Color(0xFFE94560), size: 24),
                     ),
-                    const Divider(color: Colors.white12, height: 20),
-                    _buildInstallStep(
-                      icon: Icons.apple_rounded,
-                      color: Colors.white,
-                      title: 'iPhone / iPad (Safari)',
-                      instruction: 'Tap the Share icon ⎋ at bottom, then tap "Add to Home Screen".',
-                    ),
-                    const Divider(color: Colors.white12, height: 20),
-                    _buildInstallStep(
-                      icon: Icons.laptop_chromebook_rounded,
-                      color: Colors.blueAccent,
-                      title: 'PC / Laptop (Chrome or Edge)',
-                      instruction: 'Click the Install icon ⊕ inside the URL address bar at the top right.',
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Install Nexus Chat',
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            'Install on Laptop / PC or Mobile for full-screen experience',
+                            style: TextStyle(color: Colors.white60, fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE94560),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                const SizedBox(height: 18),
+                // Primary Action Button 1: 1-Click Install PWA
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE94560),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 4,
+                    ),
+                    icon: const Icon(Icons.flash_on_rounded, color: Colors.white, size: 20),
+                    label: const Text(
+                      '⚡ Install App Now (1-Click)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    onPressed: () async {
+                      final triggered = await PwaInstaller.promptInstall();
+                      if (triggered) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            backgroundColor: Color(0xFF22C55E),
+                            content: Text('Installation prompt opened! Click "Install" to complete.'),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            backgroundColor: Color(0xFF533483),
+                            content: Text('Desktop Users: URL Address Bar ke right side me ⊕ icon par click karein!'),
+                            duration: Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    },
                   ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Got it!', style: TextStyle(color: Colors.white)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                // Primary Action Button 2: Download APK
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.greenAccent,
+                      side: const BorderSide(color: Colors.greenAccent, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.android_rounded, color: Colors.greenAccent, size: 20),
+                    label: const Text(
+                      '📱 Download Android APK',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    onPressed: () async {
+                      final uri = Uri.parse('nexus-chat.apk');
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // Highlighted Desktop Guide Callout
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.laptop_chromebook_rounded, color: Colors.blueAccent, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'PC / Laptop (Chrome ya Edge):',
+                            style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // URL bar visual simulation
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.lock, color: Colors.greenAccent, size: 13),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'https://my-ai-chat-248.web.app',
+                                style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: 'monospace'),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(Icons.add_circle_outline_rounded, color: Colors.amberAccent, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Install',
+                              style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Apne browser ke URL Address Bar me sabse upar right side bane ⊕ (Install) icon par click karein aur "Install" button dabayein.',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // Mobile Steps
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF222232),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildInstallStep(
+                        icon: Icons.android_rounded,
+                        color: Colors.greenAccent,
+                        title: 'Android Phone (Chrome)',
+                        instruction: 'Browser me 3 dots (⋮) top-right tap karein -> "Add to Home screen" / "Install app" dabayein.',
+                      ),
+                      const Divider(color: Colors.white12, height: 20),
+                      _buildInstallStep(
+                        icon: Icons.apple_rounded,
+                        color: Colors.white,
+                        title: 'iPhone / iPad (Safari)',
+                        instruction: 'Share icon ⎋ tap karein -> "Add to Home Screen" (+) select karein.',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close', style: TextStyle(color: Colors.white60)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
