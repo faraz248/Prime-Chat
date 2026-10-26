@@ -39,6 +39,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _isUploadingImage = false;
   bool _isUploadingVideo = false;
   
+  // Multi-select message deletion state
+  final Set<String> _selectedMessageIds = {};
+  bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
+
   // Swipe to reply state
   MessageModel? _replyingToMessage;
 
@@ -142,25 +146,169 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Future<String?> _showPhotoPromptDialog(Uint8List imageBytes, bool isAiChat) async {
+    final textController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: const Color(0xFF161622),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            width: 440,
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isAiChat ? const Color(0xFFE94560).withOpacity(0.2) : Colors.white10,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          isAiChat ? Icons.auto_awesome_rounded : Icons.photo_library_rounded,
+                          color: isAiChat ? const Color(0xFFE94560) : Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isAiChat ? 'AI Problem & Assignment Solver' : 'Send Photo',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              isAiChat
+                                  ? 'Write your question or problem below'
+                                  : 'Add an optional caption',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      width: double.infinity,
+                      color: Colors.black26,
+                      child: Image.memory(
+                        imageBytes,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: textController,
+                    maxLines: 3,
+                    minLines: 1,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF222232),
+                      hintText: isAiChat
+                          ? 'E.g.: "Solve question 2 step-by-step", "Explain this math problem", or "Do this assignment"...'
+                          : 'Write a caption...',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE94560), width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, null),
+                        child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE94560),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                        ),
+                        onPressed: () {
+                          final text = textController.text.trim();
+                          Navigator.pop(
+                            ctx,
+                            text.isNotEmpty
+                                ? text
+                                : (isAiChat
+                                    ? 'Please solve this assignment / question step-by-step.'
+                                    : '📷 Photo'),
+                          );
+                        },
+                        icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                        label: Text(
+                          isAiChat ? 'Solve Problem 🚀' : 'Send',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _sendImage({ImageSource source = ImageSource.gallery}) async {
     final picker = ImagePicker();
     XFile? image;
     try {
-      image = await picker.pickImage(source: source, imageQuality: 75, maxWidth: 1024, maxHeight: 1024);
+      image = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1280, maxHeight: 1280);
     } catch (e) {
       if (source == ImageSource.camera) {
         try {
-          image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1024, maxHeight: 1024);
+          image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1280, maxHeight: 1280);
         } catch (_) {}
       }
     }
 
     if (image == null) return;
 
-    setState(() => _isUploadingImage = true);
-
     try {
       final Uint8List imageBytes = await image.readAsBytes();
+      final isAiChat = widget.chatRoomId.startsWith('ai_room_');
+      
+      // Let user write their problem, question, or caption
+      final userProblemText = await _showPhotoPromptDialog(imageBytes, isAiChat);
+      if (userProblemText == null) return; // User cancelled
+
+      setState(() => _isUploadingImage = true);
+
       String? downloadUrl;
 
       // On Web, use instant Base64 (<30ms) to bypass Storage CORS delays
@@ -207,7 +355,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         await ref.read(chatServiceProvider).sendMessage(
           widget.chatRoomId,
           senderId,
-          "📷 Photo",
+          userProblemText,
           imageUrl: downloadUrl,
           replyTo: replyToData,
         );
@@ -544,6 +692,65 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  String _getDateLabel(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final msgDate = DateTime(dt.year, dt.month, dt.day);
+
+    if (msgDate == today) {
+      return 'Today';
+    } else if (msgDate == yesterday) {
+      return 'Yesterday';
+    } else if (today.difference(msgDate).inDays < 7 && today.isAfter(msgDate)) {
+      return DateFormat('EEEE').format(dt);
+    } else if (now.year == dt.year) {
+      return DateFormat('dd MMMM').format(dt);
+    } else {
+      return DateFormat('dd MMM yyyy').format(dt);
+    }
+  }
+
+  void _confirmDeleteSelected(BuildContext context) {
+    if (_selectedMessageIds.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text('Delete Messages?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to delete ${_selectedMessageIds.length} selected message(s)?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE94560)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final count = _selectedMessageIds.length;
+              final ids = _selectedMessageIds.toList();
+              setState(() => _selectedMessageIds.clear());
+              await ref.read(chatServiceProvider).deleteMultipleMessages(widget.chatRoomId, ids);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$count message(s) deleted.'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _confirmClearChat(BuildContext context) {
     showDialog(
       context: context,
@@ -651,6 +858,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   );
                 },
               ),
+            ListTile(
+              leading: const Icon(Icons.checklist_rounded, color: Colors.tealAccent),
+              title: const Text('Select Messages (Multi-Delete)', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _selectedMessageIds.add(message.id);
+                });
+              },
+            ),
             if (isMe)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
@@ -752,80 +969,120 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final currentUserId = currentUser?.uid ?? 'user_123';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.friendName ?? 'NEXUS', style: const TextStyle(fontSize: 18)),
-            if (!widget.isGroup && _friendId.isNotEmpty)
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(_friendId).snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox.shrink();
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  final Timestamp? lastSeen = data['lastSeen'];
-                  if (lastSeen == null) return const SizedBox.shrink();
-                  
-                  final diff = DateTime.now().difference(lastSeen.toDate());
-                  String status = '';
-                  if (diff.inMinutes < 2) {
-                    status = 'Online';
-                  } else if (diff.inHours < 1) {
-                    status = 'Last seen ${diff.inMinutes} mins ago';
-                  } else if (diff.inDays < 1) {
-                    status = 'Last seen ${diff.inHours} hours ago';
-                  } else {
-                    status = 'Last seen ${diff.inDays} days ago';
-                  }
-                  
-                  return Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: status == 'Online' ? Colors.greenAccent : Colors.white70,
-                      fontWeight: FontWeight.normal
-                    ),
-                  );
-                },
+      appBar: _isSelectionMode
+          ? AppBar(
+              backgroundColor: const Color(0xFF1E1E2A),
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                onPressed: () => setState(() => _selectedMessageIds.clear()),
               ),
-          ],
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x88E94560),
-                Color(0xFF0D0D12),
+              title: Text(
+                '${_selectedMessageIds.length} Selected',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              actions: [
+                messagesAsync.maybeWhen(
+                  data: (messages) => IconButton(
+                    icon: Icon(
+                      _selectedMessageIds.length == messages.length
+                          ? Icons.deselect_rounded
+                          : Icons.select_all_rounded,
+                      color: Colors.white,
+                    ),
+                    tooltip: _selectedMessageIds.length == messages.length ? 'Deselect All' : 'Select All',
+                    onPressed: () {
+                      setState(() {
+                        if (_selectedMessageIds.length == messages.length) {
+                          _selectedMessageIds.clear();
+                        } else {
+                          _selectedMessageIds.addAll(messages.map((m) => m.id));
+                        }
+                      });
+                    },
+                  ),
+                  orElse: () => const SizedBox.shrink(),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
+                  tooltip: 'Delete Selected Messages',
+                  onPressed: () => _confirmDeleteSelected(context),
+                ),
+              ],
+            )
+          : AppBar(
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.friendName ?? 'NEXUS', style: const TextStyle(fontSize: 18)),
+                  if (!widget.isGroup && _friendId.isNotEmpty)
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance.collection('users').doc(_friendId).snapshots(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox.shrink();
+                        final data = snapshot.data!.data() as Map<String, dynamic>;
+                        final Timestamp? lastSeen = data['lastSeen'];
+                        if (lastSeen == null) return const SizedBox.shrink();
+                        
+                        final diff = DateTime.now().difference(lastSeen.toDate());
+                        String status = '';
+                        if (diff.inMinutes < 2) {
+                          status = 'Online';
+                        } else if (diff.inHours < 1) {
+                          status = 'Last seen ${diff.inMinutes} mins ago';
+                        } else if (diff.inDays < 1) {
+                          status = 'Last seen ${diff.inHours} hours ago';
+                        } else {
+                          status = 'Last seen ${diff.inDays} days ago';
+                        }
+                        
+                        return Text(
+                          status,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: status == 'Online' ? Colors.greenAccent : Colors.white70,
+                            fontWeight: FontWeight.normal
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+              flexibleSpace: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x88E94560),
+                      Color(0xFF0D0D12),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                if (widget.isGroup)
+                  IconButton(
+                    icon: const Icon(Icons.info_outline),
+                    tooltip: 'Group Info',
+                    onPressed: () => _showGroupInfo(context),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.call_rounded),
+                  tooltip: 'Voice Call',
+                  onPressed: () => _startCall(isVideo: false),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.videocam_rounded),
+                  tooltip: 'Video Call',
+                  onPressed: () => _startCall(isVideo: true),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Clear Chat',
+                  onPressed: () => _confirmClearChat(context),
+                ),
               ],
             ),
-          ),
-        ),
-        actions: [
-          if (widget.isGroup)
-            IconButton(
-              icon: const Icon(Icons.info_outline),
-              tooltip: 'Group Info',
-              onPressed: () => _showGroupInfo(context),
-            ),
-          IconButton(
-            icon: const Icon(Icons.call_rounded),
-            tooltip: 'Voice Call',
-            onPressed: () => _startCall(isVideo: false),
-          ),
-          IconButton(
-            icon: const Icon(Icons.videocam_rounded),
-            tooltip: 'Video Call',
-            onPressed: () => _startCall(isVideo: true),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Clear Chat',
-            onPressed: () => _confirmClearChat(context),
-          ),
-        ],
-      ),
       body: Column(
         children: [
           Expanded(
@@ -847,10 +1104,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     final message = messages[index];
                     final isMe = message.senderId == currentUserId;
                     final isAi = message.isAiResponse || message.senderId == 'ai_assistant';
+                    final isSelected = _selectedMessageIds.contains(message.id);
 
-                    return Dismissible(
+                    // Check if date header should be shown (since reverse: true, index+1 is older message)
+                    bool showDateHeader = false;
+                    if (index == messages.length - 1) {
+                      showDateHeader = true;
+                    } else {
+                      final olderMsg = messages[index + 1];
+                      final curDate = DateTime(message.timestamp.year, message.timestamp.month, message.timestamp.day);
+                      final olderDate = DateTime(olderMsg.timestamp.year, olderMsg.timestamp.month, olderMsg.timestamp.day);
+                      if (curDate != olderDate) {
+                        showDateHeader = true;
+                      }
+                    }
+
+                    final messageBubbleWidget = Dismissible(
                       key: ValueKey('msg_${message.id}'),
-                      direction: DismissDirection.startToEnd,
+                      direction: _isSelectionMode ? DismissDirection.none : DismissDirection.startToEnd,
                       confirmDismiss: (direction) async {
                         _setReplyTo(message);
                         return false;
@@ -868,27 +1139,115 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       ),
                       child: GestureDetector(
-                        onLongPress: () => _showMessageOptions(context, message, isMe),
-                        child: _ChatBubble(
-                          message: message,
-                          isMe: isMe,
-                          isAi: isAi,
-                          isGroup: widget.isGroup,
-                          senderName: _userNamesCache[message.senderId],
-                          chatRoomId: widget.chatRoomId,
-                          currentUserId: currentUserId,
-                          onReply: () => _setReplyTo(message),
-                          onReactionToggle: (emoji) {
-                            ref.read(chatServiceProvider).toggleReaction(
-                              widget.chatRoomId,
-                              message.id,
-                              currentUserId,
-                              emoji,
-                            );
-                          },
+                        onTap: () {
+                          if (_isSelectionMode) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedMessageIds.remove(message.id);
+                              } else {
+                                _selectedMessageIds.add(message.id);
+                              }
+                            });
+                          }
+                        },
+                        onLongPress: () {
+                          HapticFeedback.mediumImpact();
+                          if (_isSelectionMode) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedMessageIds.remove(message.id);
+                              } else {
+                                _selectedMessageIds.add(message.id);
+                              }
+                            });
+                          } else {
+                            _showMessageOptions(context, message, isMe);
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFE94560).withOpacity(0.18) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            border: isSelected
+                                ? Border.all(color: const Color(0xFFE94560), width: 1.5)
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_isSelectionMode)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6, right: 2),
+                                  child: Icon(
+                                    isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                    color: isSelected ? const Color(0xFFE94560) : Colors.white38,
+                                    size: 22,
+                                  ),
+                                ),
+                              Expanded(
+                                child: _ChatBubble(
+                                  message: message,
+                                  isMe: isMe,
+                                  isAi: isAi,
+                                  isGroup: widget.isGroup,
+                                  senderName: _userNamesCache[message.senderId],
+                                  chatRoomId: widget.chatRoomId,
+                                  currentUserId: currentUserId,
+                                  onReply: () => _setReplyTo(message),
+                                  onReactionToggle: (emoji) {
+                                    ref.read(chatServiceProvider).toggleReaction(
+                                      widget.chatRoomId,
+                                      message.id,
+                                      currentUserId,
+                                      emoji,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
+
+                    if (showDateHeader) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Center(
+                            child: Container(
+                              margin: const EdgeInsets.only(top: 14, bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1E2C).withOpacity(0.92),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.25),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                _getDateLabel(message.timestamp),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.85),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ),
+                          messageBubbleWidget,
+                        ],
+                      );
+                    }
+
+                    return messageBubbleWidget;
                   },
                 );
               },
@@ -1152,6 +1511,22 @@ class _ChatBubble extends StatelessWidget {
     required this.onReply,
     required this.onReactionToggle,
   }) : super(key: key);
+
+  String _formatBubbleTime(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final msgDate = DateTime(dt.year, dt.month, dt.day);
+
+    final time = DateFormat('hh:mm a').format(dt);
+    if (msgDate == today) {
+      return 'Today, $time';
+    } else if (msgDate == yesterday) {
+      return 'Yesterday, $time';
+    } else {
+      return '${DateFormat('dd MMM').format(dt)}, $time';
+    }
+  }
 
   Widget _buildImageWidget(String url, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
     if (url.startsWith('data:image')) {
@@ -1493,10 +1868,11 @@ class _ChatBubble extends StatelessWidget {
               children: [
                 Expanded(child: _buildReactionChips()),
                 Text(
-                  DateFormat('dd MMM, HH:mm').format(message.timestamp),
+                  _formatBubbleTime(message.timestamp),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withOpacity(0.65),
                     fontSize: 10,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],

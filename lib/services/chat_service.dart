@@ -184,14 +184,17 @@ class ChatService {
     
     // AI tabhi reply karega jab ya toh 'AI Assistant' room ho, ya kisi ne message me @ai likha ho
     if (isAiRoom || hasAiCommand) {
-      
       String prompt = text;
       if (hasAiCommand) {
         prompt = text.substring(3).trim();
       }
       
-      if (prompt.isNotEmpty) {
-        String aiResponse = await _geminiService.getAiResponse(prompt);
+      if (imageUrl != null && (prompt.isEmpty || prompt == "📷 Photo")) {
+        prompt = "Please analyze this image, solve the question, problem, or assignment shown, and explain it clearly step-by-step.";
+      }
+      
+      if (prompt.isNotEmpty || imageUrl != null) {
+        String aiResponse = await _geminiService.getAiResponse(prompt, imageUrl: imageUrl);
         String? generatedImageUrl;
 
         // Check if response contains [IMAGE: ...] tag
@@ -252,7 +255,10 @@ class ChatService {
     final messages = await _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').get();
     WriteBatch batch = _firestore.batch();
     for (var doc in messages.docs) {
-      batch.delete(doc.reference);
+      batch.update(doc.reference, {
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
     }
     await batch.commit();
 
@@ -262,6 +268,22 @@ class ChatService {
   }
 
   Future<void> deleteMessage(String chatRoomId, String messageId) async {
-    await _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').doc(messageId).delete();
+    await _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').doc(messageId).update({
+      'isDeleted': true,
+      'deletedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteMultipleMessages(String chatRoomId, List<String> messageIds) async {
+    if (messageIds.isEmpty) return;
+    WriteBatch batch = _firestore.batch();
+    for (var id in messageIds) {
+      final docRef = _firestore.collection('chatRooms').doc(chatRoomId).collection('messages').doc(id);
+      batch.update(docRef, {
+        'isDeleted': true,
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
   }
 }

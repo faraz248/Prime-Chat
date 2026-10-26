@@ -65,16 +65,137 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   String _formatMessageTime(DateTime dt) {
     final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inDays == 0 && dt.day == now.day) {
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final msgDate = DateTime(dt.year, dt.month, dt.day);
+
+    if (msgDate == today) {
       return DateFormat('hh:mm a').format(dt);
-    } else if (diff.inDays == 1 || (diff.inDays == 0 && dt.day != now.day)) {
+    } else if (msgDate == yesterday) {
       return 'Yesterday';
-    } else if (diff.inDays < 7) {
+    } else if (today.difference(msgDate).inDays < 7 && today.isAfter(msgDate)) {
       return DateFormat('E').format(dt);
     } else {
       return DateFormat('dd MMM').format(dt);
     }
+  }
+
+  void _showInstallAppDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF161622),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          width: 440,
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE94560).withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.install_mobile_rounded, color: Color(0xFFE94560), size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Install Nexus App',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Use full-screen like a native installed app',
+                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF222232),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  children: [
+                    _buildInstallStep(
+                      icon: Icons.android_rounded,
+                      color: Colors.greenAccent,
+                      title: 'Android Phone (Chrome)',
+                      instruction: 'Tap browser 3 dots (⋮) top-right, then tap "Add to Home screen" or "Install app".',
+                    ),
+                    const Divider(color: Colors.white12, height: 20),
+                    _buildInstallStep(
+                      icon: Icons.apple_rounded,
+                      color: Colors.white,
+                      title: 'iPhone / iPad (Safari)',
+                      instruction: 'Tap the Share icon ⎋ at bottom, then tap "Add to Home Screen".',
+                    ),
+                    const Divider(color: Colors.white12, height: 20),
+                    _buildInstallStep(
+                      icon: Icons.laptop_chromebook_rounded,
+                      color: Colors.blueAccent,
+                      title: 'PC / Laptop (Chrome or Edge)',
+                      instruction: 'Click the Install icon ⊕ inside the URL address bar at the top right.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE94560),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Got it!', style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstallStep({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String instruction,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 3),
+              Text(instruction, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   // Deterministic, commutative room ID for two users
@@ -264,6 +385,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ),
             ),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.install_mobile_rounded, color: Colors.greenAccent),
+                tooltip: 'Install App (PWA)',
+                onPressed: () => _showInstallAppDialog(context),
+              ),
               IconButton(
                 icon: const Icon(Icons.person),
                 tooltip: 'My Profile',
